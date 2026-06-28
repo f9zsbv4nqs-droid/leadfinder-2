@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lead Intelligence OS</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  background: #0b0b0f;
+  color: #e5e5e5;
+}
+
+.container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 40px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.sub {
+  color: #888;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #15151b;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+input, select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #0f0f14;
+  color: white;
+}
+
+button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: white;
+  color: black;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #222;
+  text-align: left;
+}
+
+.score-high { color: #4ade80; }
+.score-mid { color: #facc15; }
+.score-low { color: #f87171; }
+
+.email-box {
+  white-space: pre-wrap;
+  background: #0f0f14;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #222;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Lead Intelligence OS</h1>
+<div class="sub">Real businesses from OpenStreetMap</div>
+
+<div class="card">
+
+  <h3>Search Leads</h3>
+
+  <input id="city" placeholder="City (e.g. Vienna)">
+  
+  <select id="industry">
+    <option value="restaurant">Restaurants</option>
+    <option value="hotel">Hotels</option>
+    <option value="clinic">Clinics</option>
+    <option value="gym">Gyms</option>
+    <option value="lawyer">Lawyers</option>
+  </select>
+
+  <button onclick="searchLeads()">Generate Leads</button>
+
+</div>
+
+<div class="card">
+
+  <h3>Results</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Website</th>
+        <th>Phone</th>
+        <th>Score</th>
+        <th>Email</th>
+      </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
+
+</div>
+
+<div class="card">
+
+<h3>Generated Email</h3>
+<div id="email" class="email-box">Select a lead...</div>
+
+</div>
+
+</div>
+
+<script>
+
+let leadsData = [];
+
+function scoreLead(lead) {
+  let score = 50;
+
+  if (!lead.website) score += 30;
+  if (!lead.phone) score += 10;
+
+  if (lead.website?.includes("wordpress")) score += 10;
+  if (lead.website?.includes("wix")) score += 10;
+
+  return Math.min(100, score);
+}
+
+// Overpass API call
+async function fetchLeads(city, industry) {
+
+  const query = `
+  [out:json];
+  area["name"="${city}"]->.a;
+  (
+    node["amenity"="${industry}"](area.a);
+    way["amenity"="${industry}"](area.a);
+  );
+  out center;
+  `;
+
+  const url = "https://overpass-api.de/api/interpreter";
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: query
+  });
+
+  const data = await res.json();
+
+  return data.elements.map(el => ({
+    id: el.id,
+    name: el.tags?.name || "Unknown",
+    website: el.tags?.website || null,
+    phone: el.tags?.phone || null
+  }));
+}
+
+async function searchLeads() {
+
+  const city = document.getElementById("city").value;
+  const industry = document.getElementById("industry").value;
+
+  const rawLeads = await fetchLeads(city, industry);
+
+  leadsData = rawLeads.map(l => ({
+    ...l,
+    score: scoreLead(l)
+  }));
+
+  renderTable();
+}
+
+function renderTable() {
+
+  const tbody = document.getElementById("results");
+  tbody.innerHTML = "";
+
+  leadsData.forEach((lead, i) => {
+
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${lead.name}</td>
+      <td>${lead.website || "-"}</td>
+      <td>${lead.phone || "-"}</td>
+      <td class="${getScoreClass(lead.score)}">${lead.score}</td>
+      <td><button onclick="generateEmail(${i})">Generate</button></td>
+    `;
+
+    tbody.appendChild(row);
+  });
+}
+
+function getScoreClass(score) {
+  if (score > 80) return "score-high";
+  if (score > 60) return "score-mid";
+  return "score-low";
+}
+
+function generateEmail(i) {
+
+  const lead = leadsData[i];
+
+  const email = `
+Hi ${lead.name},
+
+we noticed your business${lead.website ? " website could be significantly improved" : " currently has no visible website"}.
+
+We help local businesses improve:
+- modern design
+- mobile performance
+- customer conversion
+
+Would you like a free website review?
+
+Best regards
+Your Web Design Team
+  `;
+
+  document.getElementById("email").innerText = email;
+}
+
+</script>
+
+</body>
+</html>
