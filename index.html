@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalLeads AI</title>
+<title>LocalLeads AI v5</title>
+
+<!-- Leaflet Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
 body {
@@ -14,25 +17,22 @@ body {
 }
 
 header {
-  padding: 16px;
+  padding: 14px;
   background: #0f172a;
-  border-bottom: 1px solid #1f2937;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  border-bottom: 1px solid #1f2937;
 }
 
 .logo {
   font-weight: 700;
-  font-size: 18px;
 }
 
 .controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  flex-wrap: wrap;
 }
 
 input, select, button {
@@ -48,37 +48,70 @@ button {
   cursor: pointer;
 }
 
-#loadingWrap {
-  padding: 15px 20px;
+/* layout */
+#container {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  height: calc(100vh - 70px);
+}
+
+#map {
+  height: 100%;
 }
 
 #results {
-  padding: 18px;
+  overflow: auto;
+  padding: 10px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
+/* card */
 .card {
   background: #111827;
-  border: 1px solid #1f2937;
+  padding: 10px;
   border-radius: 12px;
-  padding: 12px;
+  border: 1px solid #1f2937;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: #3b82f6;
 }
 
 .title {
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.score {
-  margin-top: 8px;
   font-weight: bold;
 }
 
-.small {
+.score {
   font-size: 12px;
-  color: #9ca3af;
+  margin-top: 6px;
+}
+
+/* loader */
+#loadingWrap {
+  padding: 10px 14px;
+  display: none;
+}
+
+/* modal */
+#modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#modalContent {
+  background: #111827;
+  padding: 20px;
+  border-radius: 12px;
+  width: 300px;
 }
 
 </style>
@@ -87,223 +120,163 @@ button {
 <body>
 
 <header>
+  <div class="logo">🧲 LocalLeads AI v5</div>
 
-<div class="logo">🧲 LocalLeads AI</div>
+  <div class="controls">
+    <input id="place" placeholder="Ort" />
 
-<div class="controls">
+    <select id="category">
+      <option value="restaurant">Restaurant</option>
+      <option value="cafe">Café</option>
+      <option value="shop=hairdresser">Friseur</option>
+      <option value="shop=beauty">Beauty</option>
+      <option value="shop=car_repair">Auto</option>
+      <option value="shop=plumber">Installateur</option>
+    </select>
 
-<input id="place" placeholder="Ort (z.B. Ljubljana)" />
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span>Leads</span>
+      <input type="range" id="limit" min="10" max="80" value="30">
+      <span id="limitVal">30</span>
+    </div>
 
-<select id="category">
-  <option value="restaurant">Restaurant</option>
-  <option value="cafe">Café</option>
-  <option value="shop=hairdresser">Friseur</option>
-  <option value="shop=beauty">Beauty</option>
-  <option value="shop=car_repair">Autowerkstatt</option>
-  <option value="shop=plumber">Installateur</option>
-  <option value="shop=electrician">Elektriker</option>
-</select>
-
-<select id="limit">
-  <option value="20">20</option>
-  <option value="50">50</option>
-  <option value="100">100</option>
-</select>
-
-<button onclick="search()">Search</button>
-
-</div>
+    <button onclick="search()">Search</button>
+  </div>
 </header>
 
-<!-- LOADER -->
-<div id="loadingWrap" style="display:none;">
-  <div>Loading Leads... <span id="percent">0%</span></div>
+<div id="loadingWrap">Loading...</div>
 
-  <div style="width:100%; height:10px; background:#1f2937; border-radius:10px; overflow:hidden; margin-top:8px;">
-    <div id="bar" style="height:100%; width:0%; background:#3b82f6;"></div>
-  </div>
-
-  <div id="step" style="margin-top:6px; font-size:12px; color:#9ca3af;">
-    Initialisierung...
-  </div>
+<div id="container">
+  <div id="map"></div>
+  <div id="results"></div>
 </div>
 
-<div id="results"></div>
+<!-- MODAL -->
+<div id="modal" onclick="closeModal()">
+  <div id="modalContent" onclick="event.stopPropagation()"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
 
-let progress = 0;
-let interval;
+let map = L.map('map').setView([46.05, 14.5], 10);
 
-/* ---------------- LOADER ---------------- */
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OSM'
+}).addTo(map);
 
-function setProgress(val, stepText) {
-  progress = Math.min(100, val);
+let markers = [];
 
-  document.getElementById("percent").innerText = Math.round(progress) + "%";
-  document.getElementById("bar").style.width = progress + "%";
+/* slider */
+document.getElementById("limit").oninput = e => {
+  document.getElementById("limitVal").innerText = e.target.value;
+};
 
-  if (stepText) {
-    document.getElementById("step").innerText = stepText;
+/* helpers */
+function getWebsite(t){
+  return t.website || t["contact:website"] || "";
+}
+
+function score(t){
+  let s = 50;
+  if(!getWebsite(t)) s += 30;
+  if(!t.phone) s += 10;
+  return Math.min(100,s);
+}
+
+/* geocode */
+async function geocode(p){
+  let r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${p}`);
+  let d = await r.json();
+  return d[0];
+}
+
+/* modal */
+function openModal(l){
+  document.getElementById("modal").style.display="flex";
+
+  document.getElementById("modalContent").innerHTML=`
+    <h3>${l.name}</h3>
+    <p>🌐 ${getWebsite(l.tags)||"none"}</p>
+    <p>📞 ${l.tags.phone||"none"}</p>
+    <p>📍 ${l.tags["addr:street"]||""} ${l.tags["addr:housenumber"]||""}</p>
+    <p>⭐ Score: ${l.score}</p>
+  `;
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+}
+
+/* search */
+async function search(){
+
+  document.getElementById("loadingWrap").style.display="block";
+
+  const place=document.getElementById("place").value;
+  const cat=document.getElementById("category").value;
+  const limit=+document.getElementById("limit").value;
+
+  const geo=await geocode(place);
+  const b=geo.boundingbox;
+
+  let filter=cat.includes("=")?
+    `node["${cat.split("=")[0]}"="${cat.split("=")[1]}"]`
+    :`node["amenity"="${cat}"]`;
+
+  let q=`[out:json];
+  (${filter}(${b[0]},${b[2]},${b[1]},${b[3]}));
+  out;`;
+
+  let r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:q});
+  let d=await r.json();
+
+  let leads=[];
+
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+
+  document.getElementById("results").innerHTML="";
+
+  for(let e of d.elements){
+
+    let t=e.tags||{};
+    let name=t.name||"unknown";
+
+    let l={
+      name,
+      tags:t,
+      score:score(t),
+      lat:e.lat,
+      lon:e.lon
+    };
+
+    leads.push(l);
   }
-}
 
-function startLoading() {
-  document.getElementById("loadingWrap").style.display = "block";
-  setProgress(0, "Initialisierung...");
+  leads.sort((a,b)=>b.score-a.score);
+  leads=leads.slice(0,limit);
 
-  interval = setInterval(() => {
-    if (progress < 85) {
-      setProgress(progress + Math.random() * 4);
-    }
-  }, 200);
-}
+  leads.forEach(l=>{
 
-function stopLoading() {
-  clearInterval(interval);
-  setProgress(100, "Fertig");
+    let marker=L.marker([l.lat,l.lon]).addTo(map)
+    .on("click",()=>openModal(l));
 
-  setTimeout(() => {
-    document.getElementById("loadingWrap").style.display = "none";
-  }, 400);
-}
+    markers.push(marker);
 
-/* ---------------- HELPERS ---------------- */
-
-function getWebsite(t) {
-  return t.website || t["contact:website"] || t.url || "";
-}
-
-function isSocial(url) {
-  if (!url) return false;
-  url = url.toLowerCase();
-  return url.includes("facebook") ||
-         url.includes("instagram") ||
-         url.includes("linktr");
-}
-
-function scoreLead(t) {
-  let score = 50;
-
-  const website = getWebsite(t);
-
-  if (!website) score += 35;
-  else if (isSocial(website)) score += 25;
-  else score -= 20;
-
-  if (!t.phone) score += 10;
-  if (!t.email) score += 10;
-
-  return Math.max(0, Math.min(100, score));
-}
-
-/* ---------------- GEOCODE ---------------- */
-
-async function geocode(place) {
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`);
-  const data = await res.json();
-  if (!data.length) throw new Error("Ort nicht gefunden");
-  return data[0];
-}
-
-/* ---------------- MAIN SEARCH ---------------- */
-
-async function search() {
-
-  startLoading();
-
-  const place = document.getElementById("place").value;
-  const category = document.getElementById("category").value;
-  const limit = +document.getElementById("limit").value;
-
-  const results = document.getElementById("results");
-  results.innerHTML = "";
-
-  try {
-
-    setProgress(15, "Ort wird geladen...");
-
-    const geo = await geocode(place);
-
-    setProgress(35, "Unternehmen werden gesucht...");
-
-    const b = geo.boundingbox;
-
-    let filter = "";
-    if (category.includes("=")) {
-      const [k,v] = category.split("=");
-      filter = `node["${k}"="${v}"]`;
-    } else {
-      filter = `node["amenity"="${category}"]`;
-    }
-
-    const query = `
-    [out:json][timeout:25];
-    (
-      ${filter}(${b[0]},${b[2]},${b[1]},${b[3]});
-    );
-    out center tags;
+    let div=document.createElement("div");
+    div.className="card";
+    div.innerHTML=`
+      <div class="title">${l.name}</div>
+      <div>Score: ${l.score}</div>
     `;
+    div.onclick=()=>openModal(l);
 
-    setProgress(60, "Daten werden geladen...");
+    document.getElementById("results").appendChild(div);
+  });
 
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: query
-    });
-
-    const data = await res.json();
-
-    setProgress(80, "Leads werden bewertet...");
-
-    const seen = new Set();
-    let leads = [];
-
-    for (const el of data.elements) {
-      const t = el.tags || {};
-      const name = t.name || "Unknown";
-
-      if (seen.has(name)) continue;
-      seen.add(name);
-
-      leads.push({
-        name,
-        tags: t,
-        score: scoreLead(t)
-      });
-    }
-
-    leads.sort((a,b) => b.score - a.score);
-    leads = leads.slice(0, limit);
-
-    results.innerHTML = "";
-
-    for (const l of leads) {
-
-      const t = l.tags;
-
-      const card = document.createElement("div");
-      card.className = "card";
-
-      card.innerHTML = `
-        <div class="title">${l.name}</div>
-        <div class="small">
-          🌐 ${getWebsite(t) || "no website"}<br>
-          📞 ${t.phone || "no phone"}
-        </div>
-        <div class="score">Score: ${l.score}/100</div>
-      `;
-
-      results.appendChild(card);
-    }
-
-    setProgress(100, "Fertig");
-    stopLoading();
-
-  } catch (err) {
-    stopLoading();
-    results.innerHTML = "Fehler: " + err.message;
-  }
+  document.getElementById("loadingWrap").style.display="none";
 }
 
 </script>
