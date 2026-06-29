@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalLeads AI v5</title>
+<title>LocalLeads AI v6</title>
 
-<!-- Leaflet Map -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
@@ -19,10 +18,11 @@ body {
 header {
   padding: 14px;
   background: #0f172a;
+  border-bottom: 1px solid #1f2937;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  border-bottom: 1px solid #1f2937;
+  align-items: center;
 }
 
 .logo {
@@ -48,30 +48,41 @@ button {
   cursor: pointer;
 }
 
-/* layout */
-#container {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  height: calc(100vh - 70px);
+/* LOADER */
+#loadingWrap {
+  padding: 10px 14px;
+  display: none;
 }
 
-#map {
+#barContainer {
+  width: 100%;
+  height: 10px;
+  background: #1f2937;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+#bar {
   height: 100%;
+  width: 0%;
+  background: #3b82f6;
+  transition: width 0.2s;
 }
 
+/* RESULTS */
 #results {
-  overflow: auto;
-  padding: 10px;
+  padding: 12px;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 10px;
 }
 
-/* card */
 .card {
   background: #111827;
+  border: 1px solid #1f2937;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid #1f2937;
   cursor: pointer;
 }
 
@@ -80,76 +91,75 @@ button {
 }
 
 .title {
-  font-weight: bold;
+  font-weight: 700;
 }
 
-.score {
-  font-size: 12px;
-  margin-top: 6px;
-}
-
-/* loader */
-#loadingWrap {
-  padding: 10px 14px;
-  display: none;
-}
-
-/* modal */
+/* MODAL */
 #modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
+  inset: 0;
+  background: rgba(0,0,0,0.7);
   display: none;
   align-items: center;
   justify-content: center;
 }
 
 #modalContent {
+  width: 360px;
   background: #111827;
-  padding: 20px;
   border-radius: 12px;
-  width: 300px;
+  padding: 14px;
 }
 
+#map {
+  height: 220px;
+  border-radius: 10px;
+  margin-top: 10px;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <div class="logo">🧲 LocalLeads AI v5</div>
 
-  <div class="controls">
-    <input id="place" placeholder="Ort" />
+<div class="logo">🧲 LocalLeads AI v6</div>
 
-    <select id="category">
-      <option value="restaurant">Restaurant</option>
-      <option value="cafe">Café</option>
-      <option value="shop=hairdresser">Friseur</option>
-      <option value="shop=beauty">Beauty</option>
-      <option value="shop=car_repair">Auto</option>
-      <option value="shop=plumber">Installateur</option>
-    </select>
+<div class="controls">
+  <input id="place" placeholder="Ort" />
 
-    <div style="display:flex; align-items:center; gap:6px;">
-      <span>Leads</span>
-      <input type="range" id="limit" min="10" max="80" value="30">
-      <span id="limitVal">30</span>
-    </div>
+  <select id="category">
+    <option value="restaurant">Restaurant</option>
+    <option value="cafe">Café</option>
+    <option value="shop=hairdresser">Friseur</option>
+    <option value="shop=beauty">Beauty</option>
+    <option value="shop=car_repair">Auto</option>
+    <option value="shop=plumber">Installateur</option>
+  </select>
 
-    <button onclick="search()">Search</button>
-  </div>
+  <input type="range" id="limit" min="10" max="80" value="30">
+  <span id="limitVal">30</span>
+
+  <button onclick="search()">Search</button>
+</div>
+
 </header>
 
-<div id="loadingWrap">Loading...</div>
+<!-- LOADER -->
+<div id="loadingWrap">
+  <div>Loading Leads... <span id="percent">0%</span></div>
 
-<div id="container">
-  <div id="map"></div>
-  <div id="results"></div>
+  <div id="barContainer">
+    <div id="bar"></div>
+  </div>
+
+  <div id="step" style="font-size:12px;color:#9ca3af;margin-top:5px;">
+    Initialisierung...
+  </div>
 </div>
+
+<!-- RESULTS -->
+<div id="results"></div>
 
 <!-- MODAL -->
 <div id="modal" onclick="closeModal()">
@@ -160,66 +170,107 @@ button {
 
 <script>
 
-let map = L.map('map').setView([46.05, 14.5], 10);
+let progress=0;
+let interval;
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OSM'
-}).addTo(map);
-
-let markers = [];
-
-/* slider */
-document.getElementById("limit").oninput = e => {
-  document.getElementById("limitVal").innerText = e.target.value;
+document.getElementById("limit").oninput=e=>{
+  document.getElementById("limitVal").innerText=e.target.value;
 };
 
-/* helpers */
+/* LOADER */
+function setProgress(v,t){
+  progress=Math.min(100,v);
+  document.getElementById("percent").innerText=Math.round(progress)+"%";
+  document.getElementById("bar").style.width=progress+"%";
+  if(t)document.getElementById("step").innerText=t;
+}
+
+function startLoading(){
+  document.getElementById("loadingWrap").style.display="block";
+  setProgress(0,"Start...");
+  interval=setInterval(()=>{
+    if(progress<85)setProgress(progress+Math.random()*4);
+  },200);
+}
+
+function stopLoading(){
+  clearInterval(interval);
+  setProgress(100,"Fertig");
+  setTimeout(()=>{
+    document.getElementById("loadingWrap").style.display="none";
+  },400);
+}
+
+/* HELPERS */
 function getWebsite(t){
-  return t.website || t["contact:website"] || "";
+  return t.website||t["contact:website"]||"";
 }
 
 function score(t){
-  let s = 50;
-  if(!getWebsite(t)) s += 30;
-  if(!t.phone) s += 10;
+  let s=50;
+  if(!getWebsite(t))s+=30;
+  if(!t.phone)s+=10;
   return Math.min(100,s);
 }
 
-/* geocode */
+/* GEOCODE */
 async function geocode(p){
-  let r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${p}`);
-  let d = await r.json();
+  let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${p}`);
+  let d=await r.json();
   return d[0];
 }
 
-/* modal */
+/* MODAL MAP */
+let map=null;
+let marker=null;
+
 function openModal(l){
+
   document.getElementById("modal").style.display="flex";
 
   document.getElementById("modalContent").innerHTML=`
     <h3>${l.name}</h3>
     <p>🌐 ${getWebsite(l.tags)||"none"}</p>
     <p>📞 ${l.tags.phone||"none"}</p>
-    <p>📍 ${l.tags["addr:street"]||""} ${l.tags["addr:housenumber"]||""}</p>
-    <p>⭐ Score: ${l.score}</p>
+    <div id="map"></div>
   `;
+
+  setTimeout(()=>{
+
+    if(map)map.remove();
+
+    map=L.map("map").setView([l.lat,l.lon],16);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      attribution:"OSM"
+    }).addTo(map);
+
+    marker=L.marker([l.lat,l.lon]).addTo(map);
+
+  },100);
 }
 
 function closeModal(){
   document.getElementById("modal").style.display="none";
+  if(map){map.remove();map=null;}
 }
 
-/* search */
+/* MAIN */
 async function search(){
 
-  document.getElementById("loadingWrap").style.display="block";
+  startLoading();
 
-  const place=document.getElementById("place").value;
-  const cat=document.getElementById("category").value;
-  const limit=+document.getElementById("limit").value;
+  let place=document.getElementById("place").value;
+  let cat=document.getElementById("category").value;
+  let limit=+document.getElementById("limit").value;
 
-  const geo=await geocode(place);
-  const b=geo.boundingbox;
+  document.getElementById("results").innerHTML="";
+
+  let geo=await geocode(place);
+
+  setProgress(40,"Suche Daten...");
+
+  let b=geo.boundingbox;
 
   let filter=cat.includes("=")?
     `node["${cat.split("=")[0]}"="${cat.split("=")[1]}"]`
@@ -232,51 +283,46 @@ async function search(){
   let r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:q});
   let d=await r.json();
 
+  setProgress(75,"Bewertung...");
+
   let leads=[];
-
-  markers.forEach(m=>map.removeLayer(m));
-  markers=[];
-
-  document.getElementById("results").innerHTML="";
 
   for(let e of d.elements){
 
     let t=e.tags||{};
-    let name=t.name||"unknown";
-
-    let l={
-      name,
+    leads.push({
+      name:t.name||"unknown",
       tags:t,
-      score:score(t),
       lat:e.lat,
-      lon:e.lon
-    };
+      lon:e.lon,
+      score:score(t)
+    });
 
-    leads.push(l);
   }
 
   leads.sort((a,b)=>b.score-a.score);
   leads=leads.slice(0,limit);
 
+  let results=document.getElementById("results");
+
   leads.forEach(l=>{
-
-    let marker=L.marker([l.lat,l.lon]).addTo(map)
-    .on("click",()=>openModal(l));
-
-    markers.push(marker);
 
     let div=document.createElement("div");
     div.className="card";
+
     div.innerHTML=`
       <div class="title">${l.name}</div>
       <div>Score: ${l.score}</div>
     `;
+
     div.onclick=()=>openModal(l);
 
-    document.getElementById("results").appendChild(div);
+    results.appendChild(div);
+
   });
 
-  document.getElementById("loadingWrap").style.display="none";
+  setProgress(100,"Fertig");
+  stopLoading();
 }
 
 </script>
