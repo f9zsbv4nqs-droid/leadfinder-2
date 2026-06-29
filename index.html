@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>LocalLeads AI</title>
+<title>LocalLeads AI v4</title>
 
 <style>
 body {
@@ -14,35 +13,28 @@ body {
   color: #e5e7eb;
 }
 
-/* HEADER */
 header {
-  padding: 18px;
+  padding: 16px;
   background: #0f172a;
   border-bottom: 1px solid #1f2937;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: bold;
+  font-weight: 700;
   font-size: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
-.logo svg {
-  width: 28px;
-  height: 28px;
-}
-
-/* CONTROLS */
 .controls {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
 
@@ -59,19 +51,10 @@ button {
   cursor: pointer;
 }
 
-/* SLIDER */
-.slider-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-}
-
-/* RESULTS */
 #results {
-  padding: 20px;
+  padding: 18px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px;
 }
 
@@ -83,17 +66,27 @@ button {
 }
 
 .title {
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 6px;
 }
 
-.score {
+.badge {
+  display: inline-block;
   font-size: 12px;
   padding: 3px 8px;
   background: #1f2937;
-  display: inline-block;
   border-radius: 6px;
+  margin-top: 6px;
+}
+
+.score {
   margin-top: 8px;
+  font-weight: bold;
+}
+
+.small {
+  font-size: 12px;
+  color: #9ca3af;
 }
 </style>
 </head>
@@ -102,13 +95,7 @@ button {
 
 <header>
 
-<div class="logo">
-<svg viewBox="0 0 24 24" fill="none">
-<path d="M4 19V5l16-2v18l-16-2z" stroke="#3b82f6" stroke-width="2"/>
-<path d="M8 8h8M8 12h8M8 16h5" stroke="#60a5fa" stroke-width="2"/>
-</svg>
-LocalLeads AI
-</div>
+<div class="logo">🧲 LocalLeads AI v4</div>
 
 <div class="controls">
 
@@ -122,14 +109,14 @@ LocalLeads AI
   <option value="shop=car_repair">Autowerkstatt</option>
   <option value="shop=plumber">Installateur</option>
   <option value="shop=electrician">Elektriker</option>
-  <option value="shop=florist">Florist</option>
+  <option value="shop=construction">Bau</option>
 </select>
 
-<div class="slider-wrap">
-  Leads:
-  <input type="range" id="limit" min="10" max="100" value="30">
-  <span id="limitVal">30</span>
-</div>
+<select id="limit">
+  <option value="20">20</option>
+  <option value="50">50</option>
+  <option value="100">100</option>
+</select>
 
 <button onclick="search()">Search</button>
 
@@ -140,10 +127,58 @@ LocalLeads AI
 
 <script>
 
-document.getElementById("limit").oninput = (e) => {
-  document.getElementById("limitVal").innerText = e.target.value;
-};
+/* -----------------------------
+   WEBSITE CHECK
+------------------------------*/
+function getWebsite(t) {
+  return t.website || t["contact:website"] || t.url || "";
+}
 
+function isSocial(url) {
+  if (!url) return false;
+  url = url.toLowerCase();
+  return url.includes("facebook") ||
+         url.includes("instagram") ||
+         url.includes("linktr");
+}
+
+/* -----------------------------
+   SCORE ENGINE (REAL VERSION)
+------------------------------*/
+function scoreLead(t, google = null) {
+
+  let score = 50;
+
+  const website = getWebsite(t);
+
+  if (!website) score += 35;
+  else if (isSocial(website)) score += 25;
+  else score -= 20;
+
+  if (!t.phone) score += 10;
+  if (!t.email) score += 10;
+
+  // Google enrichment (optional)
+  if (google) {
+    if (google.rating && google.rating > 4.2) score -= 10;
+    if (google.user_ratings_total > 20) score -= 10;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+/* -----------------------------
+   GOOGLE PLACES (optional)
+   NOTE: API KEY NEEDED
+------------------------------*/
+async function googleSearch(name, location) {
+  // OPTIONAL: placeholder (disabled by default)
+  return null;
+}
+
+/* -----------------------------
+   GEOCODE
+------------------------------*/
 async function geocode(place) {
   const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`);
   const data = await res.json();
@@ -151,24 +186,9 @@ async function geocode(place) {
   return data[0];
 }
 
-function getWebsite(tags) {
-  return tags.website || tags["contact:website"] || tags.url || "";
-}
-
-function scoreLead(tags) {
-  let score = 50;
-
-  const website = getWebsite(tags).toLowerCase();
-
-  if (!website) score += 30;
-  if (website.includes("facebook") || website.includes("instagram")) score += 20;
-
-  if (tags.phone) score -= 10;
-  if (tags.email) score -= 10;
-
-  return Math.max(0, Math.min(100, score));
-}
-
+/* -----------------------------
+   MAIN SEARCH
+------------------------------*/
 async function search() {
 
   const place = document.getElementById("place").value;
@@ -204,37 +224,68 @@ async function search() {
 
   const data = await res.json();
 
-  results.innerHTML = "";
-
-  let count = 0;
+  /* -------------------------
+     DEDUPLICATION
+  --------------------------*/
+  const seen = new Set();
+  let leads = [];
 
   for (const el of data.elements) {
-    if (count >= limit) break;
 
     const t = el.tags || {};
     const name = t.name || "Unknown";
 
-    const website = getWebsite(t);
+    if (seen.has(name)) continue;
+    seen.add(name);
+
     const score = scoreLead(t);
+
+    leads.push({
+      name,
+      tags: t,
+      score
+    });
+  }
+
+  /* SORT BY QUALITY */
+  leads.sort((a,b) => b.score - a.score);
+
+  /* LIMIT */
+  leads = leads.slice(0, limit);
+
+  /* RENDER */
+  results.innerHTML = "";
+
+  for (const l of leads) {
+
+    const t = l.tags;
+    const website = getWebsite(t);
 
     const card = document.createElement("div");
     card.className = "card";
 
     card.innerHTML = `
-      <div class="title">${name}</div>
-      <div>🌐 ${website || "no website listed"}</div>
-      <div>📞 ${t.phone || "no phone"}</div>
-      <div class="score">Lead Score: ${score}/100</div>
+      <div class="title">${l.name}</div>
+
+      <div class="small">
+        🌐 ${website || "no website"}<br>
+        📞 ${t.phone || "no phone"}<br>
+        📍 ${t["addr:city"] || ""}
+      </div>
+
+      <div class="score">Score: ${l.score}/100</div>
+
+      <div class="badge">OSM Lead</div>
     `;
 
     results.appendChild(card);
-    count++;
   }
 
-  if (!count) {
-    results.innerHTML = "No results found";
+  if (!leads.length) {
+    results.innerHTML = "No leads found";
   }
 }
+
 </script>
 
 </body>
