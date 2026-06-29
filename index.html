@@ -1,230 +1,238 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lead Finder Pro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <style>
-    body {
-      font-family: system-ui, Arial;
-      margin: 0;
-      background: #0f172a;
-      color: #e2e8f0;
-    }
+<title>LocalLeads AI</title>
 
-    header {
-      padding: 20px;
-      background: #111827;
-      position: sticky;
-      top: 0;
-      border-bottom: 1px solid #1f2937;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: system-ui;
+  background: #0b1220;
+  color: #e5e7eb;
+}
 
-    h1 {
-      font-size: 18px;
-      margin: 0 0 10px 0;
-    }
+/* HEADER */
+header {
+  padding: 18px;
+  background: #0f172a;
+  border-bottom: 1px solid #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
 
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: bold;
+  font-size: 18px;
+}
 
-    input, select, button {
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-      font-size: 14px;
-    }
+.logo svg {
+  width: 28px;
+  height: 28px;
+}
 
-    input, select {
-      background: #1f2937;
-      color: white;
-    }
+/* CONTROLS */
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
 
-    button {
-      background: #3b82f6;
-      color: white;
-      cursor: pointer;
-      font-weight: bold;
-    }
+input, select, button {
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #111827;
+  color: white;
+}
 
-    button:hover {
-      background: #2563eb;
-    }
+button {
+  background: #3b82f6;
+  cursor: pointer;
+}
 
-    #results {
-      padding: 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 15px;
-    }
+/* SLIDER */
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
 
-    .card {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 12px;
-      padding: 15px;
-      transition: 0.2s;
-    }
+/* RESULTS */
+#results {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
 
-    .card:hover {
-      transform: translateY(-2px);
-      border-color: #3b82f6;
-    }
+.card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 12px;
+}
 
-    .name {
-      font-size: 16px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
+.title {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
 
-    .bad {
-      border-left: 4px solid #ef4444;
-    }
-
-    .meta {
-      font-size: 13px;
-      color: #94a3b8;
-      line-height: 1.5;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 3px 8px;
-      background: #1f2937;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-top: 8px;
-    }
-  </style>
+.score {
+  font-size: 12px;
+  padding: 3px 8px;
+  background: #1f2937;
+  display: inline-block;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+</style>
 </head>
 
 <body>
 
 <header>
-  <h1>Lead Finder Pro (OSM)</h1>
 
-  <div class="controls">
-    <input id="place" placeholder="Ort (z.B. Ljubljana)" />
+<div class="logo">
+<svg viewBox="0 0 24 24" fill="none">
+<path d="M4 19V5l16-2v18l-16-2z" stroke="#3b82f6" stroke-width="2"/>
+<path d="M8 8h8M8 12h8M8 16h5" stroke="#60a5fa" stroke-width="2"/>
+</svg>
+LocalLeads AI
+</div>
 
-    <select id="category">
-      <option value="restaurant">Restaurant</option>
-      <option value="hairdresser">Friseur</option>
-      <option value="car_repair">Autowerkstatt</option>
-      <option value="cafe">Café</option>
-      <option value="beauty">Kosmetik</option>
-    </select>
+<div class="controls">
 
-    <select id="limit">
-      <option value="20">20 Leads</option>
-      <option value="50">50 Leads</option>
-      <option value="100">100 Leads</option>
-    </select>
+<input id="place" placeholder="Ort (z.B. Ljubljana)" />
 
-    <button onclick="search()">Suchen</button>
-  </div>
+<select id="category">
+  <option value="restaurant">Restaurant</option>
+  <option value="cafe">Café</option>
+  <option value="shop=hairdresser">Friseur</option>
+  <option value="shop=beauty">Beauty</option>
+  <option value="shop=car_repair">Autowerkstatt</option>
+  <option value="shop=plumber">Installateur</option>
+  <option value="shop=electrician">Elektriker</option>
+  <option value="shop=florist">Florist</option>
+</select>
+
+<div class="slider-wrap">
+  Leads:
+  <input type="range" id="limit" min="10" max="100" value="30">
+  <span id="limitVal">30</span>
+</div>
+
+<button onclick="search()">Search</button>
+
+</div>
 </header>
 
 <div id="results"></div>
 
 <script>
+
+document.getElementById("limit").oninput = (e) => {
+  document.getElementById("limitVal").innerText = e.target.value;
+};
+
 async function geocode(place) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`;
-  const res = await fetch(url);
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`);
   const data = await res.json();
   if (!data.length) throw new Error("Ort nicht gefunden");
   return data[0];
 }
 
-function isBadLead(tags) {
-  const website = (tags.website || "").toLowerCase();
+function getWebsite(tags) {
+  return tags.website || tags["contact:website"] || tags.url || "";
+}
 
-  if (!website) return true;
+function scoreLead(tags) {
+  let score = 50;
 
-  const badPatterns = [
-    "facebook",
-    "instagram",
-    "linktr",
-    "google",
-    "tripadvisor"
-  ];
+  const website = getWebsite(tags).toLowerCase();
 
-  return badPatterns.some(p => website.includes(p));
+  if (!website) score += 30;
+  if (website.includes("facebook") || website.includes("instagram")) score += 20;
+
+  if (tags.phone) score -= 10;
+  if (tags.email) score -= 10;
+
+  return Math.max(0, Math.min(100, score));
 }
 
 async function search() {
+
   const place = document.getElementById("place").value;
   const category = document.getElementById("category").value;
-  const limit = parseInt(document.getElementById("limit").value);
-  const resultsDiv = document.getElementById("results");
+  const limit = +document.getElementById("limit").value;
 
-  resultsDiv.innerHTML = "Lade Leads...";
+  const results = document.getElementById("results");
+  results.innerHTML = "Loading...";
 
-  try {
-    const geo = await geocode(place);
-    const bbox = geo.boundingbox;
+  const geo = await geocode(place);
+  const b = geo.boundingbox;
 
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["amenity"="${category}"](${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]});
-        way["amenity"="${category}"](${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]});
-      );
-      out center tags;
+  let filter = "";
+  if (category.includes("=")) {
+    const [k,v] = category.split("=");
+    filter = `node["${k}"="${v}"]`;
+  } else {
+    filter = `node["amenity"="${category}"]`;
+  }
+
+  const query = `
+  [out:json][timeout:25];
+  (
+    ${filter}(${b[0]},${b[2]},${b[1]},${b[3]});
+  );
+  out center tags;
+  `;
+
+  const res = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    body: query
+  });
+
+  const data = await res.json();
+
+  results.innerHTML = "";
+
+  let count = 0;
+
+  for (const el of data.elements) {
+    if (count >= limit) break;
+
+    const t = el.tags || {};
+    const name = t.name || "Unknown";
+
+    const website = getWebsite(t);
+    const score = scoreLead(t);
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="title">${name}</div>
+      <div>🌐 ${website || "no website listed"}</div>
+      <div>📞 ${t.phone || "no phone"}</div>
+      <div class="score">Lead Score: ${score}/100</div>
     `;
 
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: query
-    });
+    results.appendChild(card);
+    count++;
+  }
 
-    const data = await res.json();
-
-    resultsDiv.innerHTML = "";
-
-    let count = 0;
-
-    for (const el of data.elements) {
-      if (count >= limit) break;
-
-      const tags = el.tags || {};
-      const name = tags.name || "Ohne Namen";
-
-      if (!isBadLead(tags)) continue;
-
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const website = tags.website || "keine";
-      const phone = tags.phone || "keine";
-      const email = tags.email || "keine";
-
-      card.innerHTML = `
-        <div class="name">${name}</div>
-
-        <div class="meta">
-          🌐 Website: ${website}<br>
-          📞 Telefon: ${phone}<br>
-          ✉️ E-Mail: ${email}
-        </div>
-
-        <div class="badge">potenzieller Lead</div>
-      `;
-
-      resultsDiv.appendChild(card);
-      count++;
-    }
-
-    if (count === 0) {
-      resultsDiv.innerHTML = "Keine passenden Leads gefunden.";
-    }
-
-  } catch (err) {
-    resultsDiv.innerHTML = "Fehler: " + err.message;
+  if (!count) {
+    results.innerHTML = "No results found";
   }
 }
 </script>
