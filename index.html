@@ -2,28 +2,132 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Lead Finder (OSM)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lead Finder Pro</title>
+
   <style>
-    body { font-family: Arial; margin: 20px; }
-    input, select, button { padding: 8px; margin: 5px; }
-    .card { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
-    .bad { border-left: 5px solid red; }
+    body {
+      font-family: system-ui, Arial;
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    header {
+      padding: 20px;
+      background: #111827;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 10px 0;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    input, select, button {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 14px;
+    }
+
+    input, select {
+      background: #1f2937;
+      color: white;
+    }
+
+    button {
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    #results {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 15px;
+      transition: 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: #3b82f6;
+    }
+
+    .name {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .bad {
+      border-left: 4px solid #ef4444;
+    }
+
+    .meta {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #1f2937;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
   </style>
 </head>
+
 <body>
 
-<h2>Lead Finder für lokale Unternehmen</h2>
+<header>
+  <h1>Lead Finder Pro (OSM)</h1>
 
-<input id="place" placeholder="Ort (z.B. Ljubljana)" />
-<select id="category">
-  <option value="restaurant">Restaurant</option>
-  <option value="hairdresser">Friseur</option>
-  <option value="car_repair">Autowerkstatt</option>
-  <option value="cafe">Café</option>
-  <option value="beauty">Kosmetik</option>
-</select>
+  <div class="controls">
+    <input id="place" placeholder="Ort (z.B. Ljubljana)" />
 
-<button onclick="search()">Suchen</button>
+    <select id="category">
+      <option value="restaurant">Restaurant</option>
+      <option value="hairdresser">Friseur</option>
+      <option value="car_repair">Autowerkstatt</option>
+      <option value="cafe">Café</option>
+      <option value="beauty">Kosmetik</option>
+    </select>
+
+    <select id="limit">
+      <option value="20">20 Leads</option>
+      <option value="50">50 Leads</option>
+      <option value="100">100 Leads</option>
+    </select>
+
+    <button onclick="search()">Suchen</button>
+  </div>
+</header>
 
 <div id="results"></div>
 
@@ -36,17 +140,29 @@ async function geocode(place) {
   return data[0];
 }
 
-function isBadWebsite(url) {
-  if (!url) return true;
-  const badPatterns = ["facebook", "instagram", "linktr", "google"];
-  return badPatterns.some(p => url.includes(p));
+function isBadLead(tags) {
+  const website = (tags.website || "").toLowerCase();
+
+  if (!website) return true;
+
+  const badPatterns = [
+    "facebook",
+    "instagram",
+    "linktr",
+    "google",
+    "tripadvisor"
+  ];
+
+  return badPatterns.some(p => website.includes(p));
 }
 
 async function search() {
   const place = document.getElementById("place").value;
   const category = document.getElementById("category").value;
+  const limit = parseInt(document.getElementById("limit").value);
   const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "Lade...";
+
+  resultsDiv.innerHTML = "Lade Leads...";
 
   try {
     const geo = await geocode(place);
@@ -61,8 +177,7 @@ async function search() {
       out center tags;
     `;
 
-    const url = "https://overpass-api.de/api/interpreter";
-    const res = await fetch(url, {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: query
     });
@@ -71,30 +186,45 @@ async function search() {
 
     resultsDiv.innerHTML = "";
 
-    data.elements.forEach(el => {
+    let count = 0;
+
+    for (const el of data.elements) {
+      if (count >= limit) break;
+
       const tags = el.tags || {};
       const name = tags.name || "Ohne Namen";
-      const website = tags.website || "";
-      const phone = tags.phone || "";
-      const email = tags.email || "";
 
-      if (!isBadWebsite(website)) return; // nur schlechte Leads
+      if (!isBadLead(tags)) continue;
 
-      const div = document.createElement("div");
-      div.className = "card bad";
+      const card = document.createElement("div");
+      card.className = "card";
 
-      div.innerHTML = `
-        <b>${name}</b><br>
-        Website: ${website || "keine"}<br>
-        Telefon: ${phone || "keine"}<br>
-        E-Mail: ${email || "keine"}
+      const website = tags.website || "keine";
+      const phone = tags.phone || "keine";
+      const email = tags.email || "keine";
+
+      card.innerHTML = `
+        <div class="name">${name}</div>
+
+        <div class="meta">
+          🌐 Website: ${website}<br>
+          📞 Telefon: ${phone}<br>
+          ✉️ E-Mail: ${email}
+        </div>
+
+        <div class="badge">potenzieller Lead</div>
       `;
 
-      resultsDiv.appendChild(div);
-    });
+      resultsDiv.appendChild(card);
+      count++;
+    }
 
-  } catch (e) {
-    resultsDiv.innerHTML = "Fehler: " + e.message;
+    if (count === 0) {
+      resultsDiv.innerHTML = "Keine passenden Leads gefunden.";
+    }
+
+  } catch (err) {
+    resultsDiv.innerHTML = "Fehler: " + err.message;
   }
 }
 </script>
