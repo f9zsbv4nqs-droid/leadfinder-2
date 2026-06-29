@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalLeads AI FIX</title>
+<title>LeadNova AI</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
@@ -11,21 +11,67 @@
 body {
   margin: 0;
   font-family: system-ui;
-  background: #0b1220;
+  background: #070b14;
   color: #e5e7eb;
 }
 
+/* ---------------- START SCREEN ---------------- */
+#startScreen {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top, #111827, #05070f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.startBox {
+  text-align: center;
+  width: 320px;
+}
+
+.logo {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  margin-top: 10px;
+  background: #111827;
+  color: white;
+}
+
+button {
+  margin-top: 15px;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* MAIN APP */
+#app {
+  display: none;
+}
+
+/* HEADER */
 header {
   padding: 14px;
   background: #0f172a;
-  border-bottom: 1px solid #1f2937;
   display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid #1f2937;
 }
-
-.logo { font-weight: 700; }
 
 .controls {
   display: flex;
@@ -33,7 +79,7 @@ header {
   flex-wrap: wrap;
 }
 
-input, select, button {
+select, input, button {
   padding: 10px;
   border-radius: 10px;
   border: none;
@@ -41,11 +87,9 @@ input, select, button {
   color: white;
 }
 
-button {
-  background: #3b82f6;
-  cursor: pointer;
-}
+button { background:#3b82f6; }
 
+/* LOADER */
 #loadingWrap {
   padding: 10px 14px;
   display: none;
@@ -57,7 +101,6 @@ button {
   background: #1f2937;
   border-radius: 10px;
   overflow: hidden;
-  margin-top: 6px;
 }
 
 #bar {
@@ -66,23 +109,33 @@ button {
   background: #3b82f6;
 }
 
-#results {
-  padding: 12px;
+/* RESULTS */
+#container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr 1fr;
+  height: calc(100vh - 70px);
+}
+
+#results {
+  overflow: auto;
+  padding: 10px;
+  display: grid;
   gap: 10px;
 }
 
 .card {
   background: #111827;
-  border: 1px solid #1f2937;
-  padding: 10px;
   border-radius: 12px;
+  padding: 10px;
+  border: 1px solid #1f2937;
   cursor: pointer;
 }
 
-.title { font-weight: 700; }
+.card:hover {
+  border-color: #3b82f6;
+}
 
+/* MODAL */
 #modal {
   position: fixed;
   inset: 0;
@@ -95,8 +148,8 @@ button {
 #modalContent {
   width: 360px;
   background: #111827;
-  border-radius: 12px;
   padding: 14px;
+  border-radius: 12px;
 }
 
 #map {
@@ -109,36 +162,61 @@ button {
 
 <body>
 
-<header>
-<div class="logo">🧲 LocalLeads AI FIX</div>
+<!-- START SCREEN -->
+<div id="startScreen">
+  <div class="startBox">
+    <div class="logo">🧠 LeadNova AI</div>
+    <div id="greet">Willkommen</div>
 
-<div class="controls">
-  <input id="place" placeholder="Ort" />
+    <input id="name" placeholder="Dein Name">
 
-  <select id="category">
-    <option value="restaurant">Restaurant</option>
-    <option value="cafe">Café</option>
-    <option value="shop=hairdresser">Friseur</option>
-    <option value="shop=beauty">Beauty</option>
-    <option value="shop=car_repair">Auto</option>
-  </select>
-
-  <input type="range" id="limit" min="10" max="80" value="30">
-  <span id="limitVal">30</span>
-
-  <button onclick="search()">Search</button>
+    <button onclick="startApp()">Start</button>
+  </div>
 </div>
+
+<!-- APP -->
+<div id="app">
+
+<header>
+  <div>🧠 LeadNova AI</div>
+
+  <div class="controls">
+
+    <input id="place" placeholder="Ort">
+
+    <select id="category">
+      <option value="restaurant">Restaurant</option>
+      <option value="cafe">Café</option>
+      <option value="shop=hairdresser">Friseur</option>
+      <option value="shop=beauty">Beauty</option>
+      <option value="shop=car_repair">Auto</option>
+    </select>
+
+    <input type="range" id="limit" min="10" max="80" value="30">
+    <span id="limitVal">30</span>
+
+    <button onclick="search()">Search</button>
+
+  </div>
 </header>
 
 <!-- LOADER -->
 <div id="loadingWrap">
   <div>Loading... <span id="percent">0%</span></div>
   <div id="barContainer"><div id="bar"></div></div>
-  <div id="step" style="font-size:12px;color:#9ca3af;"></div>
+  <div id="step"></div>
 </div>
 
-<div id="results"></div>
+<div id="container">
 
+  <div id="results"></div>
+  <div id="map"></div>
+
+</div>
+
+</div>
+
+<!-- MODAL -->
 <div id="modal" onclick="closeModal()">
   <div id="modalContent" onclick="event.stopPropagation()"></div>
 </div>
@@ -147,183 +225,172 @@ button {
 
 <script>
 
-/* ---------------- SAFETY FIX: TIMEOUT WRAPPER ---------------- */
-function withTimeout(promise, ms = 12000) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("Timeout")), ms);
-    promise.then(v => {
-      clearTimeout(t);
-      resolve(v);
-    }).catch(e => {
-      clearTimeout(t);
-      reject(e);
-    });
-  });
+let progress=0, interval;
+let userName="";
+
+function getTimeGreeting(){
+  let h=new Date().getHours();
+  if(h<12)return"Guten Morgen";
+  if(h<18)return"Guten Nachmittag";
+  return"Guten Abend";
 }
 
-/* ---------------- LOADER ---------------- */
-let progress = 0;
-let interval;
+/* START SCREEN */
+function startApp(){
+  userName=document.getElementById("name").value||"User";
 
-function setProgress(v, t) {
-  progress = Math.min(100, v);
-  document.getElementById("percent").innerText = Math.round(progress) + "%";
-  document.getElementById("bar").style.width = progress + "%";
-  if (t) document.getElementById("step").innerText = t;
+  document.getElementById("greet").innerText =
+    getTimeGreeting()+", "+userName;
+
+  document.getElementById("startScreen").style.display="none";
+  document.getElementById("app").style.display="block";
 }
 
-function startLoading() {
-  document.getElementById("loadingWrap").style.display = "block";
-  setProgress(0, "Start...");
+/* SLIDER FIX */
+document.addEventListener("DOMContentLoaded",()=>{
+  const s=document.getElementById("limit");
+  const l=document.getElementById("limitVal");
+  l.innerText=s.value;
+  s.oninput=()=>l.innerText=s.value;
+});
 
-  interval = setInterval(() => {
-    if (progress < 85) setProgress(progress + Math.random() * 4);
-  }, 200);
+/* LOADER */
+function setProgress(v,t){
+  progress=Math.min(100,v);
+  document.getElementById("percent").innerText=Math.round(v)+"%";
+  document.getElementById("bar").style.width=v+"%";
+  if(t)document.getElementById("step").innerText=t;
 }
 
-function stopLoading() {
+function startLoading(){
+  document.getElementById("loadingWrap").style.display="block";
+  setProgress(0,"Thinking...");
+
+  interval=setInterval(()=>{
+    if(progress<85)setProgress(progress+Math.random()*4);
+  },200);
+}
+
+function stopLoading(){
   clearInterval(interval);
-  setProgress(100, "Fertig");
-
-  setTimeout(() => {
-    document.getElementById("loadingWrap").style.display = "none";
-  }, 300);
+  setProgress(100,"Done");
+  setTimeout(()=>{
+    document.getElementById("loadingWrap").style.display="none";
+  },400);
 }
 
-/* ---------------- HELPERS ---------------- */
-function getWebsite(t) {
-  return t.website || t["contact:website"] || "";
+/* CORE */
+function getWebsite(t){
+  return t.website||t["contact:website"]||"";
 }
 
-function score(t) {
-  let s = 50;
-  if (!getWebsite(t)) s += 30;
-  if (!t.phone) s += 10;
-  return Math.min(100, s);
+function score(t){
+  let s=50;
+  if(!getWebsite(t))s+=30;
+  if(!t.phone)s+=10;
+  return Math.min(100,s);
 }
 
-/* ---------------- GEOCODE ---------------- */
-async function geocode(p) {
-  const r = await withTimeout(fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${p}`
-  ), 10000);
-
-  const d = await r.json();
-  if (!d.length) throw new Error("no place");
+async function geocode(p){
+  let r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${p}`);
+  let d=await r.json();
   return d[0];
 }
 
-/* ---------------- MAP MODAL ---------------- */
-let map = null;
-
-function openModal(l) {
-
-  document.getElementById("modal").style.display = "flex";
-
-  document.getElementById("modalContent").innerHTML = `
-    <h3>${l.name}</h3>
-    <p>🌐 ${getWebsite(l.tags) || "none"}</p>
-    <p>📞 ${l.tags.phone || "none"}</p>
-    <div id="map"></div>
-  `;
-
-  setTimeout(() => {
-
-    if (map) map.remove();
-
-    map = L.map("map").setView([l.lat, l.lon], 16);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "OSM"
-    }).addTo(map);
-
-    L.marker([l.lat, l.lon]).addTo(map);
-
-  }, 100);
-}
-
-function closeModal() {
-  document.getElementById("modal").style.display = "none";
-  if (map) { map.remove(); map = null; }
-}
-
-/* ---------------- MAIN SEARCH ---------------- */
-async function search() {
+/* SEARCH */
+async function search(){
 
   startLoading();
 
-  try {
+  try{
 
-    const place = document.getElementById("place").value;
-    const cat = document.getElementById("category").value;
-    const limit = +document.getElementById("limit").value;
+    const place=document.getElementById("place").value;
+    const cat=document.getElementById("category").value;
+    const limit=+document.getElementById("limit").value;
 
-    document.getElementById("results").innerHTML = "";
+    const geo=await geocode(place);
 
-    const geo = await geocode(place);
+    setProgress(40,"Scanning area...");
 
-    setProgress(40, "Suche Daten...");
+    const b=geo.boundingbox;
 
-    const b = geo.boundingbox;
+    const filter=cat.includes("=")
+      ?`node["${cat.split("=")[0]}"="${cat.split("=")[1]}"]`
+      :`node["amenity"="${cat}"]`;
 
-    const filter = cat.includes("=")
-      ? `node["${cat.split("=")[0]}"="${cat.split("=")[1]}"]`
-      : `node["amenity"="${cat}"]`;
+    const q=`[out:json];
+    (${filter}(${b[0]},${b[2]},${b[1]},${b[3]}));
+    out;`;
 
-    const query = `
-      [out:json][timeout:25];
-      (
-        ${filter}(${b[0]},${b[2]},${b[1]},${b[3]});
-      );
-      out;
-    `;
+    const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:q});
+    const d=await r.json();
 
-    const res = await withTimeout(fetch(
-      "https://overpass-api.de/api/interpreter",
-      { method: "POST", body: query }
-    ), 15000);
+    setProgress(75,"Ranking leads...");
 
-    const data = await res.json();
-
-    setProgress(75, "Verarbeite...");
-
-    let leads = data.elements.map(e => ({
-      name: e.tags?.name || "unknown",
-      tags: e.tags || {},
-      lat: e.lat,
-      lon: e.lon,
-      score: score(e.tags || {})
+    let leads=d.elements.map(e=>({
+      name:e.tags?.name||"unknown",
+      tags:e.tags||{},
+      lat:e.lat,
+      lon:e.lon,
+      score:score(e.tags||{})
     }));
 
-    leads.sort((a,b) => b.score - a.score);
-    leads = leads.slice(0, limit);
+    leads.sort((a,b)=>b.score-a.score);
+    leads=leads.slice(0,limit);
 
-    const results = document.getElementById("results");
+    const resDiv=document.getElementById("results");
+    resDiv.innerHTML="";
 
-    leads.forEach(l => {
+    leads.forEach(l=>{
 
-      const div = document.createElement("div");
-      div.className = "card";
+      let div=document.createElement("div");
+      div.className="card";
+      div.innerHTML=`${l.name}<br>Score: ${l.score}`;
+      div.onclick=()=>openModal(l);
+      resDiv.appendChild(div);
 
-      div.innerHTML = `
-        <div class="title">${l.name}</div>
-        <div>Score: ${l.score}</div>
-      `;
-
-      div.onclick = () => openModal(l);
-
-      results.appendChild(div);
     });
 
-    setProgress(100, "Fertig");
+    setProgress(100,"Done");
     stopLoading();
 
-  } catch (e) {
-    console.error(e);
+  }catch(e){
     stopLoading();
-    document.getElementById("results").innerHTML =
-      "Fehler: " + e.message;
+    alert(e.message);
   }
+}
+
+/* MODAL */
+let map;
+
+function openModal(l){
+
+  document.getElementById("modal").style.display="flex";
+
+  document.getElementById("modalContent").innerHTML=`
+    <h3>${l.name}</h3>
+    <p>Score: ${l.score}</p>
+    <div id="map"></div>
+  `;
+
+  setTimeout(()=>{
+
+    if(map)map.remove();
+
+    map=L.map("map").setView([l.lat,l.lon],16);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      attribution:"OSM"
+    }).addTo(map);
+
+    L.marker([l.lat,l.lon]).addTo(map);
+
+  },100);
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+  if(map)map.remove();
 }
 
 </script>
