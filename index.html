@@ -483,7 +483,6 @@
         <option value="shop=car_repair">Auto Repair</option>
         <option value="amenity=dentist">Dentist</option>
         <option value="shop=bakery">Bakery</option>
-        <option value="amenity=bar">Bar</option>
       </select>
     </div>
 
@@ -565,24 +564,24 @@ let markers = [];
 let allLeads = [];
 let activeCard = null;
 
-function $(id){ return document.getElementById(id); }
+function $(id) { return document.getElementById(id); }
 
-function greet(){
+function greet() {
   const h = new Date().getHours();
-  if(h < 12) return 'Good morning';
-  if(h < 18) return 'Good afternoon';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
   return 'Good evening';
 }
 
-function getWebsite(t){
+function getWebsite(t) {
   return (t.website || t['contact:website'] || '').toLowerCase();
 }
 
-function isSocialSite(url){
+function isSocialSite(url) {
   return /facebook\.|instagram\.|twitter\.|tiktok\.|linktree\./.test(url);
 }
 
-function computeScore(tags){
+function computeScore(tags) {
   const t = tags || {};
   let s = 40;
   const url = getWebsite(t);
@@ -594,44 +593,43 @@ function computeScore(tags){
   return Math.min(100, s);
 }
 
-function scoreClass(n){
-  if(n >= 75) return 'hot';
-  if(n >= 50) return 'warm';
+function scoreClass(n) {
+  if (n >= 75) return 'hot';
+  if (n >= 50) return 'warm';
   return 'cold';
 }
 
-function scoreLabel(n){
-  if(n >= 75) return '🔥 Hot lead';
-  if(n >= 50) return '⚡ Warm lead';
+function scoreLabel(n) {
+  if (n >= 75) return '🔥 Hot lead';
+  if (n >= 50) return '⚡ Warm lead';
   return '❄ Cold lead';
 }
 
-function startApp(){
-  userName = ($('obName').value || 'User').trim();
-  $('startScreen').classList.add('hide');
-  setTimeout(() => {
-    $('startScreen').style.display = 'none';
-    $('app').classList.add('visible');
-    $('greetPill').innerHTML = `${greet()}, <strong>${userName}</strong>`;
-    setTimeout(initMainMap, 350);
-  }, 500);
+// Hilfsfunktion zum Aufräumen
+function clearMarkers() {
+  markers.forEach(m => { if (mainMap) mainMap.removeLayer(m); });
+  markers = [];
 }
 
-function initMainMap(){
-  if(mainMap) return;
+function initMainMap() {
+  if (mainMap) return;
   mainMap = L.map('map', { zoomControl: true }).setView([51.5, 10], 6);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors', maxZoom: 19
   }).addTo(mainMap);
 }
 
-function fixMapSize(){
-  if(mainMap) setTimeout(() => mainMap.invalidateSize(), 150);
+function fixMapSize() {
+  if (mainMap) setTimeout(() => mainMap.invalidateSize(), 150);
 }
 
-async function runSearch(){
+async function runSearch() {
+  clearMarkers();
+  allLeads = [];
+  activeCard = null;
+
   const place = $('place').value.trim();
-  if(!place){ $('place').focus(); return; }
+  if (!place) { $('place').focus(); return; }
 
   const cat = $('category').value;
   const [key, val] = cat.split('=');
@@ -640,12 +638,12 @@ async function runSearch(){
   startLoader('Geocoding location…');
 
   let geo;
-  try{
+  try {
     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}&limit=1`);
     const d = await r.json();
-    if(!d.length) throw new Error(`Location "${place}" not found.`);
+    if (!d.length) throw new Error(`Location "${place}" not found.`);
     geo = d[0];
-  } catch(e){
+  } catch (e) {
     stopLoader();
     showError(e.message || 'Geocoding failed.');
     return;
@@ -661,13 +659,13 @@ async function runSearch(){
 out center;`;
 
   let elements;
-  try{
-    const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:q });
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body: q });
     const d = await r.json();
     elements = d.elements || [];
-  } catch(e){
+  } catch (e) {
     stopLoader();
-    showError('Overpass API error. Try again.');
+    showError('Overpass API error.');
     return;
   }
 
@@ -698,9 +696,9 @@ out center;`;
   stopLoader();
 }
 
-function renderResults(leads){
+function renderResults(leads) {
   const res = $('results');
-  if(!leads.length){
+  if (!leads.length) {
     res.innerHTML = `<div id="emptyState"><div class="empty-icon">😶</div><div class="empty-title">No businesses found</div><div class="empty-sub">Try a different city or category.</div></div>`;
     $('resultCount').textContent = '0';
     return;
@@ -718,70 +716,160 @@ function renderResults(leads){
       </div>
       <div class="card-meta">
         ${phone ? `<div class="meta-chip">📞 ${escHtml(phone)}</div>` : `<div class="chip-pill">No phone</div>`}
-        ${url ? `<div class="chip-pill">${isSocialSite(url)?'Social only':'Has website'}</div>` : `<div class="chip-pill">No website</div>`}
+        ${url ? `<div class="chip-pill" title="${escHtml(url)}">${isSocialSite(url)?'Social only':'Has website'}</div>` : `<div class="chip-pill">No website</div>`}
       </div>
       <div class="score-bar-wrap"><div class="score-bar ${cls}" style="width:${l.score}%"></div></div>
     </div>`;
   }).join('');
 }
 
-function cardClick(i){
+function cardClick(i) {
   highlightCard(i);
   openModal(allLeads[i]);
-  if(mainMap && allLeads[i]){
-    mainMap.setView([allLeads[i].lat, allLeads[i].lon], 16);
+  if (mainMap && allLeads[i]) {
+    mainMap.setView([allLeads[i].lat, allLeads[i].lon], 16, {animate: true});
     markers[i] && markers[i].openPopup();
   }
 }
 
-function highlightCard(i){
-  if(activeCard !== null) $(`card-${activeCard}`)?.classList.remove('active');
-  $(`card-${i}`)?.classList.add('active');
+function highlightCard(i) {
+  if (activeCard !== null) {
+    const prev = $(`card-${activeCard}`);
+    if (prev) prev.classList.remove('active');
+  }
+  const card = $(`card-${i}`);
+  if (card) {
+    card.classList.add('active');
+    card.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  }
   activeCard = i;
 }
 
-function openModal(l){ /* bleibt gleich wie in Original */ 
-  // (Aus Platzgründen nicht komplett kopiert – nimm den Originalcode für openModal, closeModal etc.)
-  console.log("Modal opened for", l.name);
+function openModal(l) {
+  const t = l.tags || {};
+  const cls = scoreClass(l.score);
+  const url = getWebsite(t);
+  const phone = t.phone || t['contact:phone'] || '';
+  const email = t.email || t['contact:email'] || '';
+  const hours = t.opening_hours || '';
+  const addr = [t['addr:street'], t['addr:housenumber'], t['addr:city']].filter(Boolean).join(' ');
+
+  $('mTitle').textContent = l.name;
+  const sn = $('mScoreNum');
+  sn.textContent = l.score;
+  sn.className = 'modal-score-num ' + cls;
+  const mq = $('mQuality');
+  mq.textContent = scoreLabel(l.score);
+  mq.className = 'modal-quality ' + cls;
+
+  const fields = [
+    ['Website', url ? `<a href="${url}" target="_blank">${url}</a>` : null, 'No website'],
+    ['Phone', phone ? escHtml(phone) : null, 'No phone'],
+    ['Email', email ? `<a href="mailto:${email}">${email}</a>` : null, 'No email'],
+    ['Hours', hours ? escHtml(hours) : null, 'No hours'],
+    ['Address', addr ? escHtml(addr) : null, 'No address']
+  ];
+
+  $('mFields').innerHTML = fields.map(([k,v,fb]) => `
+    <div class="mf-row">
+      <span class="mf-key">${k}</span>
+      ${v ? `<span class="mf-val">${v}</span>` : `<span class="mf-missing">${fb}</span>`}
+    </div>`).join('');
+
+  $('modal').classList.add('open');
+
+  setTimeout(() => {
+    if (modalMap) modalMap.remove();
+    modalMap = L.map('modalMap').setView([l.lat, l.lon], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(modalMap);
+    L.marker([l.lat, l.lon]).addTo(modalMap);
+    modalMap.invalidateSize();
+  }, 100);
 }
 
-function closeModal(){
+function closeModal() {
   $('modal').classList.remove('open');
 }
 
-function handleModalClick(e){
-  if(e.target === $('modal')) closeModal();
+function handleModalClick(e) {
+  if (e.target === $('modal')) closeModal();
 }
 
-// Progress & Utils (unverändert)
+// Progress Functions
 let _pct = 0, _pInterval;
-function startLoader(msg){ /* ... */ }
-function setProgress(v, msg){ /* ... */ }
-function stopLoader(){ /* ... */ }
-
-function plotMarkers(leads){
-  // ... (Originalcode)
-  console.log(leads.length + " markers plotted");
+function startLoader(msg) {
+  _pct = 0;
+  $('loaderBar').classList.add('active');
+  $('statusBar').classList.add('active');
+  setProgress(5, msg);
+  _pInterval = setInterval(() => {
+    if (_pct < 80) setProgress(_pct + Math.random()*4);
+  }, 180);
 }
 
-function escHtml(s=''){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function setProgress(v, msg) {
+  _pct = Math.min(100, v);
+  $('loaderFill').style.width = _pct + '%';
+  $('statusPct').textContent = Math.round(_pct) + '%';
+  if (msg) $('statusText').textContent = msg;
 }
 
-function withTimeout(promise, ms){
-  return Promise.race([promise, new Promise((_,rej) => setTimeout(() => rej(new Error('Timeout')), ms))]);
+function stopLoader() {
+  clearInterval(_pInterval);
+  setProgress(100, 'Done');
+  setTimeout(() => {
+    $('loaderBar').classList.remove('active');
+    $('statusBar').classList.remove('active');
+  }, 600);
 }
 
-function showError(msg){
+function plotMarkers(leads) {
+  clearMarkers();
+  if (!leads.length) return;
+  const bounds = [];
+  leads.forEach((l, i) => {
+    const cls = scoreClass(l.score);
+    const colors = { hot:'#22c55e', warm:'#eab308', cold:'#ef4444' };
+    const icon = L.divIcon({
+      html: `<div style="width:28px;height:28px;border-radius:50%;background:${colors[cls]};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;">${l.score}</div>`,
+      className: '', iconSize:[28,28], iconAnchor:[14,14]
+    });
+    const m = L.marker([l.lat, l.lon], {icon})
+      .addTo(mainMap)
+      .bindPopup(`<b>${l.name}</b><br>Score: ${l.score}`);
+    m.on('click', () => { openModal(l); highlightCard(i); });
+    markers.push(m);
+    bounds.push([l.lat, l.lon]);
+  });
+  mainMap.fitBounds(bounds, { padding:[40,40] });
+  $('mapOverlay').classList.add('hidden');
+}
+
+function escHtml(s = '') {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showError(msg) {
   $('results').innerHTML = `<div id="emptyState"><div class="empty-icon">⚠️</div><div class="empty-title">Error</div><div class="empty-sub">${escHtml(msg)}</div></div>`;
 }
 
-// Event Listener
+// Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
   $('limit').addEventListener('input', () => $('limitVal').textContent = $('limit').value);
-  $('place').addEventListener('keydown', e => { if(e.key==='Enter') runSearch(); });
-  $('obName').addEventListener('keydown', e => { if(e.key==='Enter') startApp(); });
+  $('place').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+  $('obName').addEventListener('keydown', e => { if (e.key === 'Enter') startApp(); });
 });
+
+function startApp() {
+  userName = ($('obName').value || 'User').trim();
+  $('startScreen').classList.add('hide');
+  setTimeout(() => {
+    $('startScreen').style.display = 'none';
+    $('app').classList.add('visible');
+    $('greetPill').innerHTML = `${greet()}, <strong>${userName}</strong>`;
+    setTimeout(initMainMap, 300);
+  }, 500);
+}
 </script>
 </body>
 </html>
