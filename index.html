@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalLeads AI v4</title>
+<title>LocalLeads AI</title>
 
 <style>
 body {
@@ -26,9 +26,6 @@ header {
 .logo {
   font-weight: 700;
   font-size: 18px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
 }
 
 .controls {
@@ -51,6 +48,10 @@ button {
   cursor: pointer;
 }
 
+#loadingWrap {
+  padding: 15px 20px;
+}
+
 #results {
   padding: 18px;
   display: grid;
@@ -70,15 +71,6 @@ button {
   margin-bottom: 6px;
 }
 
-.badge {
-  display: inline-block;
-  font-size: 12px;
-  padding: 3px 8px;
-  background: #1f2937;
-  border-radius: 6px;
-  margin-top: 6px;
-}
-
 .score {
   margin-top: 8px;
   font-weight: bold;
@@ -88,6 +80,7 @@ button {
   font-size: 12px;
   color: #9ca3af;
 }
+
 </style>
 </head>
 
@@ -95,7 +88,7 @@ button {
 
 <header>
 
-<div class="logo">🧲 LocalLeads AI v4</div>
+<div class="logo">🧲 LocalLeads AI</div>
 
 <div class="controls">
 
@@ -109,7 +102,6 @@ button {
   <option value="shop=car_repair">Autowerkstatt</option>
   <option value="shop=plumber">Installateur</option>
   <option value="shop=electrician">Elektriker</option>
-  <option value="shop=construction">Bau</option>
 </select>
 
 <select id="limit">
@@ -123,13 +115,61 @@ button {
 </div>
 </header>
 
+<!-- LOADER -->
+<div id="loadingWrap" style="display:none;">
+  <div>Loading Leads... <span id="percent">0%</span></div>
+
+  <div style="width:100%; height:10px; background:#1f2937; border-radius:10px; overflow:hidden; margin-top:8px;">
+    <div id="bar" style="height:100%; width:0%; background:#3b82f6;"></div>
+  </div>
+
+  <div id="step" style="margin-top:6px; font-size:12px; color:#9ca3af;">
+    Initialisierung...
+  </div>
+</div>
+
 <div id="results"></div>
 
 <script>
 
-/* -----------------------------
-   WEBSITE CHECK
-------------------------------*/
+let progress = 0;
+let interval;
+
+/* ---------------- LOADER ---------------- */
+
+function setProgress(val, stepText) {
+  progress = Math.min(100, val);
+
+  document.getElementById("percent").innerText = Math.round(progress) + "%";
+  document.getElementById("bar").style.width = progress + "%";
+
+  if (stepText) {
+    document.getElementById("step").innerText = stepText;
+  }
+}
+
+function startLoading() {
+  document.getElementById("loadingWrap").style.display = "block";
+  setProgress(0, "Initialisierung...");
+
+  interval = setInterval(() => {
+    if (progress < 85) {
+      setProgress(progress + Math.random() * 4);
+    }
+  }, 200);
+}
+
+function stopLoading() {
+  clearInterval(interval);
+  setProgress(100, "Fertig");
+
+  setTimeout(() => {
+    document.getElementById("loadingWrap").style.display = "none";
+  }, 400);
+}
+
+/* ---------------- HELPERS ---------------- */
+
 function getWebsite(t) {
   return t.website || t["contact:website"] || t.url || "";
 }
@@ -142,11 +182,7 @@ function isSocial(url) {
          url.includes("linktr");
 }
 
-/* -----------------------------
-   SCORE ENGINE (REAL VERSION)
-------------------------------*/
-function scoreLead(t, google = null) {
-
+function scoreLead(t) {
   let score = 50;
 
   const website = getWebsite(t);
@@ -158,27 +194,11 @@ function scoreLead(t, google = null) {
   if (!t.phone) score += 10;
   if (!t.email) score += 10;
 
-  // Google enrichment (optional)
-  if (google) {
-    if (google.rating && google.rating > 4.2) score -= 10;
-    if (google.user_ratings_total > 20) score -= 10;
-  }
-
   return Math.max(0, Math.min(100, score));
 }
 
-/* -----------------------------
-   GOOGLE PLACES (optional)
-   NOTE: API KEY NEEDED
-------------------------------*/
-async function googleSearch(name, location) {
-  // OPTIONAL: placeholder (disabled by default)
-  return null;
-}
+/* ---------------- GEOCODE ---------------- */
 
-/* -----------------------------
-   GEOCODE
-------------------------------*/
 async function geocode(place) {
   const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`);
   const data = await res.json();
@@ -186,103 +206,103 @@ async function geocode(place) {
   return data[0];
 }
 
-/* -----------------------------
-   MAIN SEARCH
-------------------------------*/
+/* ---------------- MAIN SEARCH ---------------- */
+
 async function search() {
+
+  startLoading();
 
   const place = document.getElementById("place").value;
   const category = document.getElementById("category").value;
   const limit = +document.getElementById("limit").value;
 
   const results = document.getElementById("results");
-  results.innerHTML = "Loading...";
-
-  const geo = await geocode(place);
-  const b = geo.boundingbox;
-
-  let filter = "";
-  if (category.includes("=")) {
-    const [k,v] = category.split("=");
-    filter = `node["${k}"="${v}"]`;
-  } else {
-    filter = `node["amenity"="${category}"]`;
-  }
-
-  const query = `
-  [out:json][timeout:25];
-  (
-    ${filter}(${b[0]},${b[2]},${b[1]},${b[3]});
-  );
-  out center tags;
-  `;
-
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: query
-  });
-
-  const data = await res.json();
-
-  /* -------------------------
-     DEDUPLICATION
-  --------------------------*/
-  const seen = new Set();
-  let leads = [];
-
-  for (const el of data.elements) {
-
-    const t = el.tags || {};
-    const name = t.name || "Unknown";
-
-    if (seen.has(name)) continue;
-    seen.add(name);
-
-    const score = scoreLead(t);
-
-    leads.push({
-      name,
-      tags: t,
-      score
-    });
-  }
-
-  /* SORT BY QUALITY */
-  leads.sort((a,b) => b.score - a.score);
-
-  /* LIMIT */
-  leads = leads.slice(0, limit);
-
-  /* RENDER */
   results.innerHTML = "";
 
-  for (const l of leads) {
+  try {
 
-    const t = l.tags;
-    const website = getWebsite(t);
+    setProgress(15, "Ort wird geladen...");
 
-    const card = document.createElement("div");
-    card.className = "card";
+    const geo = await geocode(place);
 
-    card.innerHTML = `
-      <div class="title">${l.name}</div>
+    setProgress(35, "Unternehmen werden gesucht...");
 
-      <div class="small">
-        🌐 ${website || "no website"}<br>
-        📞 ${t.phone || "no phone"}<br>
-        📍 ${t["addr:city"] || ""}
-      </div>
+    const b = geo.boundingbox;
 
-      <div class="score">Score: ${l.score}/100</div>
+    let filter = "";
+    if (category.includes("=")) {
+      const [k,v] = category.split("=");
+      filter = `node["${k}"="${v}"]`;
+    } else {
+      filter = `node["amenity"="${category}"]`;
+    }
 
-      <div class="badge">OSM Lead</div>
+    const query = `
+    [out:json][timeout:25];
+    (
+      ${filter}(${b[0]},${b[2]},${b[1]},${b[3]});
+    );
+    out center tags;
     `;
 
-    results.appendChild(card);
-  }
+    setProgress(60, "Daten werden geladen...");
 
-  if (!leads.length) {
-    results.innerHTML = "No leads found";
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: query
+    });
+
+    const data = await res.json();
+
+    setProgress(80, "Leads werden bewertet...");
+
+    const seen = new Set();
+    let leads = [];
+
+    for (const el of data.elements) {
+      const t = el.tags || {};
+      const name = t.name || "Unknown";
+
+      if (seen.has(name)) continue;
+      seen.add(name);
+
+      leads.push({
+        name,
+        tags: t,
+        score: scoreLead(t)
+      });
+    }
+
+    leads.sort((a,b) => b.score - a.score);
+    leads = leads.slice(0, limit);
+
+    results.innerHTML = "";
+
+    for (const l of leads) {
+
+      const t = l.tags;
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <div class="title">${l.name}</div>
+        <div class="small">
+          🌐 ${getWebsite(t) || "no website"}<br>
+          📞 ${t.phone || "no phone"}
+        </div>
+        <div class="score">Score: ${l.score}/100</div>
+      `;
+
+      results.appendChild(card);
+    }
+
+    setProgress(100, "Fertig");
+    stopLoading();
+
+  } catch (err) {
+    stopLoading();
+    results.innerHTML = "Fehler: " + err.message;
   }
 }
 
